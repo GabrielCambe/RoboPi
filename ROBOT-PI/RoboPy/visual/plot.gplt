@@ -1,0 +1,15 @@
+reset
+set title "ARG2"    
+set xlabel "X"    
+set ylabel "Y" 
+
+set autoscale
+set dgrid3d
+set hidden3d
+set samples 256, 256
+set isosamples 256, 256
+splot ARG1 using 1:2:3 title 'Frente' w lines linetype 1
+replot ARG2 using 1:2:3 title 'Direita' w lines linetype 2
+replot ARG3 using 1:2:3 title 'Esquerda' w lines linetype 3
+
+pause -1 "Pressione enter para continuar!"

@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "/home/gabriel/Downloads/LSE/wiringPi"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"curses.h": "c",
+			"movimento.h": "c",
+			"stdlib.h": "c"
+		}
+	}
+}

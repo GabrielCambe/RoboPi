@@ -1,0 +1,10 @@
+#print(commands[(event.type, event.code)])
+#print(event.value)
+#print('\n')
+
+#print('Joystick Lx: ' + str(Lx.value) + ' Joystick Ly: '  + str(Ly.value))
+#print('Joystick Lx: ' + str(Lx.value) + ' Joystick Ly: '  + str(Ly.value))
+
+#print('General PWM: ' + str(pwm.value))
+
+#print('Left PWM: ' + str(pwmLeft.value) + ' Rightt PWM: ' +  str(pwmRight.value))
