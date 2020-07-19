@@ -1,5 +1,6 @@
 import numpy
 
+
 class Filter(object):
     def __init__(self, maxsize, filtering_function):
         self.values = []
@@ -25,3 +26,24 @@ def MedianFilter(maxsize):
 
 def MeanFilter(maxsize):
     return Filter(maxsize, numpy.mean)
+
+
+# class CompositeFilter(object):
+#     def __init__(self, filters):
+#         self.filters = filters
+    
+#     def add_value(self, value):
+#         if(len(self.values) == self.maxsize):
+#             self.values.pop(0)
+#         self.values.append(value)
+
+#     def get_value(self):
+#         if(len(self.values) == self.maxsize):
+#             return self.filtering_function(self.values)
+#         else:
+#             return self.values[-1]        
+
+# class CompositeFilterArray(object):
+#     def __init__(self, array):
+#         # super().__init__()
+#         self.filters = array

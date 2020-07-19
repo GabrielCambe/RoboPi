@@ -12,8 +12,8 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("csv_file", help="The file containing the data.", type=str)
 group = parser.add_mutually_exclusive_group()
-group.add_argument("--pwm", action="Set the labels as the pwm values of the motors.")
-group.add_argument("--control", action="Set the labels as the gamepad's Lx and Ly axis variables.")
+group.add_argument("--pwm", help="Set the labels as the pwm values of the motors.", action="store_true")
+group.add_argument("--control", help="Set the labels as the gamepad's Lx and Ly axis variables.", action="store_true")
 parser.add_argument("-v", "--verbose", help="Print verbose information", action="store_true")
 
 

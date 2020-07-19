@@ -6,6 +6,15 @@ import numpy
 import argparse
 
 parser = argparse.ArgumentParser()
+parser.add_argument(
+    '-f', '--file',
+    dest='csv_files',
+    type=str, nargs='+',
+    action='store',
+    required=True,
+    const=None, default=None,
+    help='Path to one or more csv files.'
+)
 parser.add_argument("-u", "--unfiltered", help="Save a raw version of the dataframe to a CSV file.", action="store_true")
 parser.add_argument("-s", "--simple", help="Save a simply filtered version of the dataframe to a CSV file.", action="store_true")
 parser.add_argument("-med", "--median", help="Save a median filtered version of the dataframe to a CSV file.", action="store_true")
@@ -41,16 +50,12 @@ def simple_filtering(df, maxRight, maxLeft, maxFront):
     df = df[df.frontSensor < maxFront]
     return df
 
-def filter_data(df, column_names, windowSize, filteringFunction, filterPwm=False, filterSteer=False):    
+def filter_data(df, column_names, windowSize, filteringFunction, filterPwm=False):    
     frontFilter = Filter(windowSize, filteringFunction)
     rightFilter = Filter(windowSize, filteringFunction)
     leftFilter = Filter(windowSize, filteringFunction)
     if(filterPwm):
         pwmFilter = Filter(windowSize, filteringFunction)
-    if(filterSteer):
-        steerLFilter = Filter(windowSize, filteringFunction)
-        steerRFilter = Filter(windowSize, filteringFunction)
-    
     
     df = simple_filtering(df, 200.0, 200.0, 300.0)
     filteredDf = pandas.DataFrame(columns = column_names)
@@ -61,30 +66,22 @@ def filter_data(df, column_names, windowSize, filteringFunction, filterPwm=False
         rightFilter.add_value(row['rightSensor'])
         leftFilter.add_value(row['leftSensor'])
         
+        # newRow = {}
+        # for key in column_names:
+        #     newRow[key] = row[key]
+
         if(filterPwm):
             pwmFilter.add_value(row['pwm'])
-            if(filterSteer):
-                steerLFilter.add_value(row['steerLeft'])
-                steerRFilter.add_value(row['steerRight'])
-                filteredDf = filteredDf.append({
-                    'gamepadLx':row['gamepadLx'], 'gamepadLy':row['gamepadLy'],
-                    'frontSensor': frontFilter.get_value(),
-                    'rightSensor': rightFilter.get_value(),
-                    'leftSensor': leftFilter.get_value(),
-                    'pwm': pwmFilter.get_value(),'pwmLeft': row['pwmLeft'],'pwmRight': row['pwmRight'],
-                    'steerLeft': steerLFilter.get_value(), 'steerRight':steerRFilter.get_value(),
-                    'ticksRight':row['ticksRight'] ,'ticksLeft':row['ticksLeft']
-                    }, ignore_index=True)
-            else:
-                filteredDf = filteredDf.append({
-                    'gamepadLx':row['gamepadLx'], 'gamepadLy':row['gamepadLy'],
-                    'frontSensor': frontFilter.get_value(),
-                    'rightSensor': rightFilter.get_value(),
-                    'leftSensor': leftFilter.get_value(),
-                    'pwm': pwmFilter.get_value(),'pwmLeft': row['pwmLeft'],'pwmRight': row['pwmRight'],
-                    'steerLeft': row['steerLeft'], 'steerRight': row['steerRight'],
-                    'ticksRight':row['ticksRight'] ,'ticksLeft':row['ticksLeft']
-                    }, ignore_index=True)
+            filteredDf = filteredDf.append({
+                'gamepadLx':row['gamepadLx'], 'gamepadLy':row['gamepadLy'],
+                'frontSensor': frontFilter.get_value(),
+                'rightSensor': rightFilter.get_value(),
+                'leftSensor': leftFilter.get_value(),
+                'pwm': pwmFilter.get_value(),'pwmLeft': row['pwmLeft'],'pwmRight': row['pwmRight'],
+                'steerLeft': row['steerLeft'], 'steerRight': row['steerRight'],
+                'ticksRight':row['ticksRight'] ,'ticksLeft':row['ticksLeft']
+            }, ignore_index=True)
+
         else:
             filteredDf = filteredDf.append({
                 'gamepadLx':row['gamepadLx'], 'gamepadLy':row['gamepadLy'],
@@ -179,9 +176,14 @@ def save_and_show(Df, csvFileName, htmlFileName):
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    sample_df = pandas.read_csv(sys.argv[1])
+    if args.verbose:
+        print("FILES TO APPEND:")
+        for item in args.csv_files:
+            print(item)
+
+    sample_df = pandas.read_csv(args.csv_files[0])    
     ret = append_data(
-        csvList=sys.argv[1:], columns_names=list(sample_df.columns.values.toList())
+       csvList=args.csv_files, column_names=list(sample_df.columns.values)
     )        
     
     if(args.unfiltered):
