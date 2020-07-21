@@ -6,12 +6,19 @@ import numpy
 import argparse
 
 parser = argparse.ArgumentParser()
+# parser.add_argument(
+#     '-f', '--file',
+#     dest='csv_files',
+#     type=str, nargs='+',
+#     action='store',
+#     required=True,
+#     const=None, default=None,
+#     help='Path to one or more csv files.'
+# )
 parser.add_argument(
-    '-f', '--file',
-    dest='csv_files',
+    "csv_files",
     type=str, nargs='+',
     action='store',
-    required=True,
     const=None, default=None,
     help='Path to one or more csv files.'
 )

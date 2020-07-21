@@ -57,12 +57,42 @@ def handle_axis_event(var):
     )
 
 
+def go_forward(var, ticks):
+    initial_ticksRight = var['ticksRight'].value
+    initial_ticksLeft = var['ticksLeft'].value
+
+    while ((var['ticksRight'].value - initial_ticksRight) < ticks) and ((var['ticksLeft'].value - initial_ticksLeft) < ticks):
+        var['Lx'].value = 128
+        var['Ly'].value = 0
+    
+    print("go foward " + str(var['ticksRight'].value))
+    print("go foward " + str(var['ticksLeft'].value))
+        
+def go_right(var, ticks):
+    initial_ticksRight = var['ticksRight'].value
+
+    while (var['ticksRight'].value - initial_ticksRight) < ticks:
+        var['Lx'].value = 255
+        var['Ly'].value = 128
+
+    print("go_right " + str(var['ticksRight'].value))
+
+def go_left(var, ticks):
+    initial_ticksLeft = var['ticksLeft'].value
+
+    while (var['ticksLeft'].value - initial_ticksLeft) < ticks:
+        var['Lx'].value = 0
+        var['Ly'].value = 128
+
+    print("go_left " + str(var['ticksLeft'].value))
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     '-r', '--regressor',
     dest='regressor',
     type=str, nargs='?',
     action='store',
+    required=False,
     const=None, default=None,
     help='Path to a regressor\'s pickle dump to be loaded to the program\s CONTROL regressor.'
 )
@@ -92,7 +122,8 @@ var = {
     'PwmRegressorLoaded': Value(c_bool, False, lock=False),
     'time': Value('d', 0.0, lock=False),
     'UsingRegressor': Value(c_bool, False, lock=False),
-    'RegressorLoaded': Value(c_bool, False, lock=False)
+    'RegressorLoaded': Value(c_bool, False, lock=False),
+    'UsingLogic': Value(c_bool, False, lock=False)
 }
 
 
@@ -131,8 +162,10 @@ motorsProcess.start()
 riseRight_detect = lambda channel,arg1=(var, False): motorcontrol.encoder_pin_callback(arg1)
 riseLeft_detect = lambda channel, arg1=(var, True): motorcontrol.encoder_pin_callback(arg1)
 
-GPIO.add_event_detect(2, GPIO.BOTH, callback=riseRight_detect, bouncetime=25)
-GPIO.add_event_detect(3, GPIO.BOTH, callback=riseLeft_detect, bouncetime=25)
+# GPIO.add_event_detect(2, GPIO.BOTH, callback=riseRight_detect, bouncetime=25)
+# GPIO.add_event_detect(3, GPIO.BOTH, callback=riseLeft_detect, bouncetime=25)
+GPIO.add_event_detect(2, GPIO.RISING, callback=riseRight_detect, bouncetime=25)
+GPIO.add_event_detect(3, GPIO.RISING, callback=riseLeft_detect, bouncetime=25)
 
 
 # Load the regressor passed as an argument
@@ -177,88 +210,138 @@ print('btn_A: Stop/Start new log')
 print('btn_LB: Go in a straight line (for calibration tests)')
 print('btn_RB: Stops the calibration test and returns to the outer loop')
 
-
-while(True):
+while True:
     event = gamepad.read_one()
-    try: 
-        if (var['UsingRegressor'].value):
-            features = np.asarray(
-                [[
-                    var['distF'].value, var['distR'].value, var['distL'].value,
-                    var['ticksRight'].value, var['ticksLeft'].value
-                ]],
-                dtype=float
-            )
-            prediction = controlRegressor.predict(features)        
-            var['Lx'].value, var['Ly'].value = (int(prediction[0][0]), int(prediction[0][1])) 
-            if args.verbose:
-                print("Lx: " + str(prediction[0][0]) + ", Ly: " + str(prediction[0][1]))
+    # try:
+    #     print("Command: " + str(commands[(event.type, event.code)]))
+    #     print("Value: " + str(event.value))
+    # except (AttributeError, KeyError) as error:
+    #     pass
+
+    if (var['UsingRegressor'].value):
+        features = np.asarray(
+            [[
+                var['distF'].value, var['distR'].value, var['distL'].value,
+                var['ticksRight'].value, var['ticksLeft'].value
+            ]],
+            dtype=float
+        )
+        prediction = controlRegressor.predict(features)        
+        var['Lx'].value = int(prediction[0][0]) 
+        var['Ly'].value = int(prediction[0][1])
+        
+        handle_axis_event(var)
+
+    elif (var['UsingLogic'].value):
+        # if var['distF'].value > 25.0:
+        #     var['Ly'].value = 0
+        #     if (var['distL'].value - ((var['distL'].value + var['distR'].value)/2.0)) > 5.0:
+        #         var['Lx'].value = np.clip(var['Lx'].value - 4, 0, 255)
+        #     elif (var['distR'].value - ((var['distL'].value + var['distR'].value)/2.0)) > 5.0:
+        #         var['Lx'].value = np.clip(var['Lx'].value + 4, 0, 255)
+        # else:
+        #     var['Lx'].value = 128
+        #     var['Ly'].value = 128
+
+        if var['distF'].value > 25.0:
+            go_forward(var, 20) 
+        else:
+            var['Lx'].value = 128
+            var['Ly'].value = 128
             
-            handle_axis_event(var)
+        if var['distL'].value >= var['distR'].value:
+            go_left(var, 20)
+        else:
+            go_right(var, 20)
 
+        print("Lx: " + str(var['Lx'].value) + ", Ly: " + str(var['Ly'].value))
 
-        if(commands[(event.type, event.code)] == 'Ly' and (not var['UsingRegressor'].value)): # Update Ly and the general PWM value
+        handle_axis_event(var)
+
+    try: 
+        if(commands[(event.type, event.code)] == 'Ly' and (not var['UsingRegressor'].value) and (not var['UsingLogic'].value)): # Update Ly and the general PWM value
             var['Ly'].value = event.value
-
             handle_axis_event(var)
 
 
-        elif(commands[(event.type, event.code)] == 'Lx' and (not var['UsingRegressor'].value)): # Update Lx and the PWM value
+        elif(commands[(event.type, event.code)] == 'Lx' and (not var['UsingRegressor'].value) and (not var['UsingLogic'].value)): # Update Lx and the PWM value
             var['Lx'].value = event.value
-
             handle_axis_event(var)
                     
 
         elif(commands[(event.type, event.code)] == 'btn_LB'): # Go in a straight line (for calibration tests)
-            # Simulates the joystick position that tells the prototype to go straight forward
-            var['Ly'].value = 0
-            var['Lx'].value = 128
-            pwmPoint = mathematics.map_to_unit_interval(var['Lx'].value, var['Ly'].value)
-            var['pwm'].value = 0.0
-            
-            motorcontrol.reset_factors(1.0, var['trimFactorRight'], var['trimFactorLeft'], False)
-            motorcontrol.reset_ticks(1.0, var['ticksRight'], var['ticksLeft'], False)
-            
-            # Set the PWM value for each motor
-            motorcontrol.set_pwm_value(
-                var,
-                pwmLeftA, pwmLeftB, pwmRightA, pwmRightB
-            )
+            if(event.value == 1): # The key was pressed, not released
+                # Simulates the joystick position that tells the prototype to go straight forward
+                var['Ly'].value = 0
+                var['Lx'].value = 128
+                pwmPoint = mathematics.map_to_unit_interval(var['Lx'].value, var['Ly'].value)
+                var['pwm'].value = 0.0
+                
+                motorcontrol.reset_factors(1.0, var['trimFactorRight'], var['trimFactorLeft'], False)
+                motorcontrol.reset_ticks(1.0, var['ticksRight'], var['ticksLeft'], False)
+                
+                # Set the PWM value for each motor
+                motorcontrol.set_pwm_value(
+                    var,
+                    pwmLeftA, pwmLeftB, pwmRightA, pwmRightB
+                )
 
-            for subEvent in gamepad.read_loop(): # Inside loop that waits for the command to stop the calibration    
-                try:
-                    if(commands[(subEvent.type, subEvent.code)] == 'Rt'): # Define PWM
-                        var['pwm'].value = float(subEvent.value)/255.0
+                for subEvent in gamepad.read_loop(): # Inside loop that waits for the command to stop the calibration    
+                    try:
+                        if(commands[(subEvent.type, subEvent.code)] == 'Rt'): # Define PWM
+                            var['pwm'].value = float(subEvent.value)/255.0
 
-                        #motorcontrol.reset_factors(1.0, trimFactorRight, trimFactorLeft, False)
-                        motorcontrol.reset_ticks(
-                            1.0, var['ticksRight'], var['ticksLeft'], False
-                        )
-                        # Set the PWM value for each motor
-                        motorcontrol.set_pwm_value(
-                            var,
-                            pwmLeftA, pwmLeftB, pwmRightA, pwmRightB
-                        )
+                            #motorcontrol.reset_factors(1.0, trimFactorRight, trimFactorLeft, False)
+                            motorcontrol.reset_ticks(
+                                1.0, var['ticksRight'], var['ticksLeft'], False
+                            )
+                            # Set the PWM value for each motor
+                            motorcontrol.set_pwm_value(
+                                var,
+                                pwmLeftA, pwmLeftB, pwmRightA, pwmRightB
+                            )
 
 
-                    elif(commands[(subEvent.type, subEvent.code)] == 'btn_RB'): # Stops the calibration test and returns to the outer loop
-                        var['Lx'].value = 128
-                        var['Ly'].value = 128
-                        pwmPoint = mathematics.map_to_unit_interval(var['Lx'].value, var['Ly'].value)
-                        var['pwm'].value = 0.0
+                        elif(commands[(subEvent.type, subEvent.code)] == 'btn_RB'): # Stops the calibration test and returns to the outer loop
+                            var['Lx'].value = 128
+                            var['Ly'].value = 128
+                            pwmPoint = mathematics.map_to_unit_interval(var['Lx'].value, var['Ly'].value)
+                            var['pwm'].value = 0.0
 
-                        motorcontrol.reset_factors(1.0, var['trimFactorRight'], var['trimFactorLeft'], False)
-                        motorcontrol.reset_ticks(1.0, var['ticksRight'], var['ticksLeft'], False)
-                        # Set the PWM value for each motor
-                        motorcontrol.set_pwm_value(
-                            var,
-                            pwmLeftA, pwmLeftB, pwmRightA, pwmRightB
-                        )
+                            motorcontrol.reset_factors(1.0, var['trimFactorRight'], var['trimFactorLeft'], False)
+                            motorcontrol.reset_ticks(1.0, var['ticksRight'], var['ticksLeft'], False)
+                            # Set the PWM value for each motor
+                            motorcontrol.set_pwm_value(
+                                var,
+                                pwmLeftA, pwmLeftB, pwmRightA, pwmRightB
+                            )
+                            
+                            break
                         
-                        break
-                    
-                except KeyError: # Keeps going forward otherwise
-                    pass
+                    except KeyError: # Keeps going forward otherwise
+                        pass
+
+
+        elif(commands[(event.type, event.code)] == 'btn_B'): # Go in a straight line (for calibration tests)
+            if(event.value == 1): # The key was pressed, not released
+                # Simulates the joystick position that tells the prototype to go straight forward
+                var['Ly'].value = 128
+                var['Lx'].value = 128
+                
+                motorcontrol.reset_factors(1.0, var['trimFactorRight'], var['trimFactorLeft'], False)
+                motorcontrol.reset_ticks(1.0, var['ticksRight'], var['ticksLeft'], False)
+                
+                # Set the PWM value for each motor
+                motorcontrol.set_pwm_value(
+                    var,
+                    pwmLeftA, pwmLeftB, pwmRightA, pwmRightB
+                )
+
+                if(var['UsingLogic'].value == True):
+                    var['UsingLogic'].value = False
+                else:
+                    var['UsingLogic'].value = True
+                    var['UsingRegressor'].value = False
 
 
         elif(commands[(event.type, event.code)] == 'btn_A'): # Stop/Start new log
@@ -290,6 +373,7 @@ while(True):
                     if(var['RegressorLoaded'].value):
                         print("\n\nRegressor ON!\n\n")
                         var['UsingRegressor'].value = True
+                        var['UsingLogic'].value = False
                     else:
                         print('\n\nRegressor Not Loaded!\n\n')
 
@@ -317,6 +401,5 @@ while(True):
             # Exit program
             sys.exit()
             
-    
     except (KeyError, AttributeError) as error:
         pass

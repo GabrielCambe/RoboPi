@@ -3,21 +3,21 @@
 #include <stdio.h>
 
 //MOTORES
-#define MOTOR0e 19
-#define MOTOR1e 26
+#define MOTOR0e 6
+#define MOTOR1e 5
 //
-#define MOTOR0d 13
-#define MOTOR1d 6
+#define MOTOR0d 26
+#define MOTOR1d 13
 
 //SENSORES
-#define TRIGfront 2
-#define ECHOfront 3
+#define TRIGfront 24
+#define ECHOfront 23
 //
-#define TRIGdir 18 
-#define ECHOdir 23
+#define TRIGdir 27 
+#define ECHOdir 17
 //
-#define TRIGesq 4
-#define ECHOesq 17
+#define TRIGesq 8
+#define ECHOesq 25
 
 int main(){
     int ch;

@@ -5,6 +5,9 @@ clean:
 	@rm -rf control.py_* || true
 	@ls
 
+list_csv:
+	@ls control.py_* -Ss1pq --block-size=1
+	
 count:
 	@ls control.py_* | wc -l
 
