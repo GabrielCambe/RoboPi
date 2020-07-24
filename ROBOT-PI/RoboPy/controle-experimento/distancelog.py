@@ -21,7 +21,7 @@ import numpy
 def thread_log(
     frequency,
     shared_variables,
-    verbose=False
+    verbosity
 ):
 
     # Initialize the log file's name
@@ -93,8 +93,9 @@ def thread_log(
             shared_variables['ticksLeft'].value, shared_variables['ticksRight'].value
         ]
 
-        if(verbose):
-            print(log)
+        if verbosity:
+            if('log' in verbosity):
+                print(log)
 
         with open(logFileName, 'ab') as arquivo:
             logger = csv.writer(arquivo)

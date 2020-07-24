@@ -27,8 +27,11 @@ pwmRightB = 1.0
 ln25 = np.log(25.0)
 lg11 = (np.log(11.0)/np.log(2))
 
+WHEEL_DIAMETER_CM = 22.0
+SPACES_PER_REVOLUTION = 20.0
+WHEEL_AXIS_SIZE_CM = 13.0
 
-def handle_axis_event(var):
+def handle_axis_event(var, verbosity):
     pwmPoint = mathematics.map_to_unit_interval(var['Lx'].value, var['Ly'].value)
     if(not var['UsingPwmRegressor'].value):
         aux = mathematics.round_to_1_if_greater(np.linalg.norm(pwmPoint))
@@ -53,51 +56,109 @@ def handle_axis_event(var):
                  
     motorcontrol.set_pwm_value(
         var,
-        pwmLeftA, pwmLeftB, pwmRightA, pwmRightB
+        pwmLeftA, pwmLeftB, pwmRightA, pwmRightB,
+        verbosity
     )
 
 
-def go_forward(var, ticks):
+def go_forward(var, cm, verbosity):
     initial_ticksRight = var['ticksRight'].value
     initial_ticksLeft = var['ticksLeft'].value
-
+    
+    ticks = int(cm * (SPACES_PER_REVOLUTION/WHEEL_DIAMETER_CM))
+    
     while ((var['ticksRight'].value - initial_ticksRight) < ticks) and ((var['ticksLeft'].value - initial_ticksLeft) < ticks):
         var['Lx'].value = 128
         var['Ly'].value = 0
+        handle_axis_event(var, verbosity)
     
     print("go foward " + str(var['ticksRight'].value))
     print("go foward " + str(var['ticksLeft'].value))
-        
-def go_right(var, ticks):
+
+    var['Ly'].value = 128
+    var['Lx'].value = 128
+                
+    motorcontrol.reset_factors(1.0, var['trimFactorRight'], var['trimFactorLeft'], False)
+    motorcontrol.reset_ticks(1.0, var['ticksRight'], var['ticksLeft'], False)
+                
+    # Set the PWM value for each motor
+    motorcontrol.set_pwm_value(
+        var,
+        pwmLeftA, pwmLeftB, pwmRightA, pwmRightB,
+        var
+    )
+
+
+def go_right(var, deg, verbosity): 
+    arcLenght_cm = (deg/360.0) * (2 * np.math.pi * (WHEEL_DIAMETER_CM/2.0))
+    ticks = int(arcLenght_cm * (SPACES_PER_REVOLUTION/WHEEL_DIAMETER_CM))
+    
     initial_ticksRight = var['ticksRight'].value
 
     while (var['ticksRight'].value - initial_ticksRight) < ticks:
         var['Lx'].value = 255
         var['Ly'].value = 128
-
+        handle_axis_event(var, verbosity)
+    
     print("go_right " + str(var['ticksRight'].value))
 
-def go_left(var, ticks):
+    var['Ly'].value = 128
+    var['Lx'].value = 128
+                
+    motorcontrol.reset_factors(1.0, var['trimFactorRight'], var['trimFactorLeft'], False)
+    motorcontrol.reset_ticks(1.0, var['ticksRight'], var['ticksLeft'], False)
+                
+    # Set the PWM value for each motor
+    motorcontrol.set_pwm_value(
+        var,
+        pwmLeftA, pwmLeftB, pwmRightA, pwmRightB,
+        var
+    )
+
+
+def go_left(var, deg, verbosity): 
+    arcLenght_cm = (deg/360.0) * (2 * np.math.pi * (WHEEL_DIAMETER_CM/2.0))
+    ticks = int(arcLenght_cm * (SPACES_PER_REVOLUTION/WHEEL_DIAMETER_CM))
+    
     initial_ticksLeft = var['ticksLeft'].value
 
     while (var['ticksLeft'].value - initial_ticksLeft) < ticks:
         var['Lx'].value = 0
         var['Ly'].value = 128
-
+        handle_axis_event(var, verbosity)
+    
     print("go_left " + str(var['ticksLeft'].value))
 
+    var['Ly'].value = 128
+    var['Lx'].value = 128
+                
+    motorcontrol.reset_factors(1.0, var['trimFactorRight'], var['trimFactorLeft'], False)
+    motorcontrol.reset_ticks(1.0, var['ticksRight'], var['ticksLeft'], False)
+                
+    # Set the PWM value for each motor
+    motorcontrol.set_pwm_value(
+        var,
+        pwmLeftA, pwmLeftB, pwmRightA, pwmRightB,
+        var
+    )
+
+
 parser = argparse.ArgumentParser()
-parser.add_argument(
-    '-r', '--regressor',
+parser.add_argument( "-r", "--regressor",
     dest='regressor',
     type=str, nargs='?',
     action='store',
     required=False,
     const=None, default=None,
-    help='Path to a regressor\'s pickle dump to be loaded to the program\s CONTROL regressor.'
+    help="Path to a regressor's pickle dump to be loaded to the program\s CONTROL regressor."
 )
-parser.add_argument("-v", "--verbose", help="Print verbose information", action="store_true")
-
+parser.add_argument( "-v", "--verbosity",
+    type=str, nargs='+', choices=['log', 'commands', 'logic', 'motor', 'encoder'],
+    dest='verbosity',
+    action='store',
+    const=None, default=None,
+    help="Print verbose information",
+)
 args = parser.parse_args()
 
 
@@ -139,7 +200,7 @@ logProcess = Process(
     args=(
         256.0,
         var,
-        args.verbose
+        args.verbosity
     )
 )
 logProcess.daemon = True
@@ -152,20 +213,19 @@ motorsProcess = Process(
     args=(
         512.0,
         var,
-        pwmLeftA, pwmLeftB, pwmRightA, pwmRightB
+        pwmLeftA, pwmLeftB, pwmRightA, pwmRightB,
+        args.verbosity
     )
 )
 motorsProcess.daemon = True
 motorsProcess.start()
 
 # Creating the callback functions for the optic encoder interrupts
-riseRight_detect = lambda channel,arg1=(var, False): motorcontrol.encoder_pin_callback(arg1)
-riseLeft_detect = lambda channel, arg1=(var, True): motorcontrol.encoder_pin_callback(arg1)
+riseRight_detect = lambda channel,arg1=(var['ticksRight']): motorcontrol.encoder_pin_callback(arg1)
+riseLeft_detect = lambda channel, arg1=(var['ticksLeft']): motorcontrol.encoder_pin_callback(arg1)
 
-# GPIO.add_event_detect(2, GPIO.BOTH, callback=riseRight_detect, bouncetime=25)
-# GPIO.add_event_detect(3, GPIO.BOTH, callback=riseLeft_detect, bouncetime=25)
-GPIO.add_event_detect(2, GPIO.RISING, callback=riseRight_detect, bouncetime=25)
-GPIO.add_event_detect(3, GPIO.RISING, callback=riseLeft_detect, bouncetime=25)
+GPIO.add_event_detect(2, GPIO.BOTH, callback=riseRight_detect, bouncetime=10)
+GPIO.add_event_detect(3, GPIO.BOTH, callback=riseLeft_detect, bouncetime=10)
 
 
 # Load the regressor passed as an argument
@@ -212,11 +272,18 @@ print('btn_RB: Stops the calibration test and returns to the outer loop')
 
 while True:
     event = gamepad.read_one()
-    # try:
-    #     print("Command: " + str(commands[(event.type, event.code)]))
-    #     print("Value: " + str(event.value))
-    # except (AttributeError, KeyError) as error:
-    #     pass
+    if args.verbosity:
+        if 'commands' in args.verbosity:
+            try:
+                print("Command: " + str(commands[(event.type, event.code)]))
+                print("Value: " + str(event.value))
+            except (AttributeError, KeyError) as error:
+                pass
+
+        if 'encoder' in args.verbosity:
+            print("ticksLeft: " + str(var['ticksLeft'].value))
+            print("ticksRight: " + str(var['ticksRight'].value))
+
 
     if (var['UsingRegressor'].value):
         features = np.asarray(
@@ -230,9 +297,20 @@ while True:
         var['Lx'].value = int(prediction[0][0]) 
         var['Ly'].value = int(prediction[0][1])
         
-        handle_axis_event(var)
+        handle_axis_event(var, args.verbosity)
 
     elif (var['UsingLogic'].value):
+        # go_forward(var, 25.0, args.verbosity) 
+        # go_left(var, 90.0, args.verbosity)
+        # go_right(var, 90.0, args.verbosity)
+
+        # if(var['UsingLogic'].value == True):
+        #     var['UsingLogic'].value = False
+        # else:
+        #     var['UsingLogic'].value = True
+        #     var['UsingRegressor'].value = False
+
+
         # if var['distF'].value > 25.0:
         #     var['Ly'].value = 0
         #     if (var['distL'].value - ((var['distL'].value + var['distR'].value)/2.0)) > 5.0:
@@ -243,30 +321,33 @@ while True:
         #     var['Lx'].value = 128
         #     var['Ly'].value = 128
 
+        
         if var['distF'].value > 25.0:
-            go_forward(var, 20) 
+            go_forward(var, 25.0, args.verbosity) 
         else:
             var['Lx'].value = 128
             var['Ly'].value = 128
             
         if var['distL'].value >= var['distR'].value:
-            go_left(var, 20)
+            go_left(var, 90.0, args.verbosity)
         else:
-            go_right(var, 20)
+            go_right(var, 90.0, args.verbosity)
 
-        print("Lx: " + str(var['Lx'].value) + ", Ly: " + str(var['Ly'].value))
+        if args.verbosity:
+            if ('logic' in args.verbosity):
+                print("Lx: " + str(var['Lx'].value) + ", Ly: " + str(var['Ly'].value))
 
-        handle_axis_event(var)
+        time.sleep(1.0/4.0)
 
     try: 
         if(commands[(event.type, event.code)] == 'Ly' and (not var['UsingRegressor'].value) and (not var['UsingLogic'].value)): # Update Ly and the general PWM value
             var['Ly'].value = event.value
-            handle_axis_event(var)
+            handle_axis_event(var, args.verbosity)
 
 
         elif(commands[(event.type, event.code)] == 'Lx' and (not var['UsingRegressor'].value) and (not var['UsingLogic'].value)): # Update Lx and the PWM value
             var['Lx'].value = event.value
-            handle_axis_event(var)
+            handle_axis_event(var, args.verbosity)
                     
 
         elif(commands[(event.type, event.code)] == 'btn_LB'): # Go in a straight line (for calibration tests)
@@ -334,7 +415,8 @@ while True:
                 # Set the PWM value for each motor
                 motorcontrol.set_pwm_value(
                     var,
-                    pwmLeftA, pwmLeftB, pwmRightA, pwmRightB
+                    pwmLeftA, pwmLeftB, pwmRightA, pwmRightB,
+                    var
                 )
 
                 if(var['UsingLogic'].value == True):
@@ -390,7 +472,8 @@ while True:
             
             motorcontrol.set_pwm_value(
                 var,
-                pwmLeftA, pwmLeftB, pwmRightA, pwmRightB
+                pwmLeftA, pwmLeftB, pwmRightA, pwmRightB,
+                args.verbosity
             )
             motorsProcess.terminate()
             
